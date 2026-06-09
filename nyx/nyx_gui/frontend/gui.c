@@ -40,6 +40,24 @@ static bool do_auto_reload = false;
 
 static volatile u32 _fps_frames = 0;
 
+#define FPS_TEST_LANES 3
+#define FPS_TEST_BALL_SZ 64
+#define FPS_TEST_SPEED 600 // px/s.
+#define FPS_TEST_PANEL_HZ 90
+
+typedef struct _fps_test_ctx_t
+{
+	lv_obj_t  *balls[FPS_TEST_LANES];
+	lv_task_t *task;
+	u32 start_ms;
+	u32 master_frame;
+	u32 frames[FPS_TEST_LANES];
+	s32 range;
+} fps_test_ctx_t;
+
+static fps_test_ctx_t fps_test;
+static const u32 _fps_test_rates[FPS_TEST_LANES] = { 30, 60, 90 };
+
 lv_style_t hint_small_style;
 lv_style_t hint_small_style_white;
 lv_style_t monospace_text;
@@ -317,7 +335,9 @@ static void _disp_fb_flush(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const
 	gfx_set_rect_pitch((u32 *)NYX_FB2_ADDRESS, (u32 *)color_p, 1280, x1, y1, x2, y2);
 
 	// Rotate and copy to visible framebuffer.
-	if (disp_init_done)
+	// During the FPS test the test task composes once per panel frame instead,
+	// as LVGL flushes (and would compose) once per invalidated area.
+	if (disp_init_done && !fps_test.task)
 	{
 		vic_compose();
 		_fps_frames++;
@@ -2024,30 +2044,19 @@ failed_sd_mount:
 	return LV_RES_OK;
 }
 
-#define FPS_TEST_LANES    3
-#define FPS_TEST_BALL_SZ  64
-#define FPS_TEST_SPEED    600 // px/s.
-
-typedef struct _fps_test_ctx_t
-{
-	lv_obj_t  *balls[FPS_TEST_LANES];
-	lv_task_t *task;
-	u32 start_ms;
-	u32 frames[FPS_TEST_LANES];
-	s32 range;
-} fps_test_ctx_t;
-
-static fps_test_ctx_t fps_test;
-static const u32 _fps_test_rates[FPS_TEST_LANES] = { 30, 60, 90 };
-
 static void _fps_test_task(void *params)
 {
-	bool moved = false;
 	u32 elapsed = get_tmr_ms() - fps_test.start_ms;
 
-	for (u32 i = 0; i < FPS_TEST_LANES; i++)
-	{
-		u32 frame = elapsed * _fps_test_rates[i] / 1000;
+	u32 master = elapsed * FPS_TEST_PANEL_HZ / 1000;
+	if (master == fps_test.master_frame)
+		return;
+	fps_test.master_frame = master;
+
+	bool moved = false;
+
+	for (u32 i = 0; i < FPS_TEST_LANES; i++) {
+		u32 frame = master * _fps_test_rates[i] / FPS_TEST_PANEL_HZ;
 		if (frame == fps_test.frames[i])
 			continue;
 		fps_test.frames[i] = frame;
@@ -2060,8 +2069,11 @@ static void _fps_test_task(void *params)
 		moved = true;
 	}
 
-	if (moved)
+	if (moved) {
 		lv_refr_now();
+		vic_compose();
+		_fps_frames++;
+	}
 }
 
 static lv_res_t _fps_test_close_action(lv_obj_t *btn)
@@ -2089,6 +2101,7 @@ static lv_res_t _create_window_fps_test(lv_obj_t *btn)
 
 	fps_test.range = lv_obj_get_width(cont) - FPS_TEST_BALL_SZ;
 	fps_test.start_ms = get_tmr_ms();
+	fps_test.master_frame = 0;
 
 	u32 lane_height = lv_obj_get_height(cont) / FPS_TEST_LANES;
 
@@ -2548,7 +2561,8 @@ static void _nyx_main_menu(lv_theme_t * th)
 			 (nyx_str->info_ex.rsvd_flags & RSVD_FLAG_DRAM_8GB) ? '*' : 0);
 	lv_obj_t *tab_about = lv_tabview_add_tab(tv, version);
 
-	lv_obj_t *tab_home = lv_tabview_add_tab(tv, SYMBOL_HOME" Home");
+	lv_obj_t *tab_home = lv_tabview_add_tab(
+		tv, SYMBOL_HOME" Home");
 
 	lv_obj_t *tab_tools = lv_tabview_add_tab(tv, SYMBOL_TOOLS" Tools");
 	lv_page_set_style(tab_tools, LV_PAGE_STYLE_BG, &no_padding);
