@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Moving Ball FPS Test - 30 vs 60 vs 90</title>
+<style>
+	:root { color-scheme: dark; }
+
+	body {
+		margin: 0;
+		background: #2d2d2d;
+		color: #d8d8d8;
+		font-family: "Segoe UI", sans-serif;
+		overflow: hidden;
+	}
+
+	header {
+		display: flex;
+		align-items: baseline;
+		gap: 24px;
+		padding: 14px 24px;
+		border-bottom: 1px solid #dddddd;
+	}
+
+	header h1 {
+		margin: 0;
+		font-size: 20px;
+		font-weight: 600;
+		color: #ff8000; /* hekate orange */
+	}
+
+	header .hz {
+		font-size: 15px;
+		color: #96ff00;
+	}
+
+	header .hint {
+		font-size: 13px;
+		color: #888888;
+	}
+
+	.lane {
+		position: relative;
+		height: calc((100vh - 60px) / 3);
+		border-bottom: 1px solid #444444;
+		box-sizing: border-box;
+	}
+
+	.lane .label {
+		position: absolute;
+		top: 8px;
+		left: 16px;
+		font-size: 15px;
+		color: #d8d8d8;
+	}
+
+	.ball {
+		position: absolute;
+		top: 50%;
+		left: 0;
+		width: 64px;
+		height: 64px;
+		margin-top: -32px;
+		border-radius: 50%;
+		will-change: transform;
+	}
+</style>
+</head>
+<body>
+	<header>
+		<h1>Moving Ball FPS Test</h1>
+		<span class="hz" id="hz">Display: ... Hz</span>
+		<span class="hint">Same speed (600 px/s), different update rates. A 60 Hz monitor cannot show the 90 FPS lane correctly.</span>
+	</header>
+
+	<div id="lanes"></div>
+
+<script>
+"use strict";
+
+const LANES = [
+	{ fps: 30, color: "#ff5555" },
+	{ fps: 60, color: "#ffdd00" },
+	{ fps: 90, color: "#96ff00" },
+];
+const BALL_SZ = 64;  // px
+const SPEED   = 600; // px/s
+
+const lanesEl = document.getElementById("lanes");
+for (const lane of LANES) {
+	const div = document.createElement("div");
+	div.className = "lane";
+	div.innerHTML = `<span class="label">${lane.fps} FPS</span>`;
+
+	const ball = document.createElement("div");
+	ball.className = "ball";
+	ball.style.background = lane.color;
+	div.appendChild(ball);
+
+	lane.ball  = ball;
+	lane.frame = -1;
+	lanesEl.appendChild(div);
+}
+
+const startMs = performance.now();
+
+let rafCount = 0;
+let rafWindowStart = startMs;
+const hzEl = document.getElementById("hz");
+
+function tick(nowMs) {
+	const elapsed = nowMs - startMs;
+	const range = lanesEl.clientWidth - BALL_SZ;
+
+	for (const lane of LANES) {
+		const frame = Math.floor(elapsed * lane.fps / 1000);
+		if (frame === lane.frame)
+			continue;
+		lane.frame = frame;
+
+		let pos = Math.floor(frame * SPEED / lane.fps) % (2 * range);
+		if (pos > range)
+			pos = 2 * range - pos;
+		lane.ball.style.transform = `translateX(${pos}px)`;
+	}
+
+	rafCount++;
+	if (nowMs - rafWindowStart >= 1000) {
+		const hz = Math.round(rafCount * 1000 / (nowMs - rafWindowStart));
+		hzEl.textContent = `Display: ${hz} Hz`;
+		hzEl.style.color = hz >= 85 ? "#96ff00" : "#ffdd00";
+		rafCount = 0;
+		rafWindowStart = nowMs;
+	}
+
+	requestAnimationFrame(tick);
+}
+
+requestAnimationFrame(tick);
+</script>
+</body>
+</html>

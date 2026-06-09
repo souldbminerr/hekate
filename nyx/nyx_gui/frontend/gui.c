@@ -2024,6 +2024,102 @@ failed_sd_mount:
 	return LV_RES_OK;
 }
 
+#define FPS_TEST_LANES    3
+#define FPS_TEST_BALL_SZ  64
+#define FPS_TEST_SPEED    600 // px/s.
+
+typedef struct _fps_test_ctx_t
+{
+	lv_obj_t  *balls[FPS_TEST_LANES];
+	lv_task_t *task;
+	u32 start_ms;
+	u32 frames[FPS_TEST_LANES];
+	s32 range;
+} fps_test_ctx_t;
+
+static fps_test_ctx_t fps_test;
+static const u32 _fps_test_rates[FPS_TEST_LANES] = { 30, 60, 90 };
+
+static void _fps_test_task(void *params)
+{
+	bool moved = false;
+	u32 elapsed = get_tmr_ms() - fps_test.start_ms;
+
+	for (u32 i = 0; i < FPS_TEST_LANES; i++)
+	{
+		u32 frame = elapsed * _fps_test_rates[i] / 1000;
+		if (frame == fps_test.frames[i])
+			continue;
+		fps_test.frames[i] = frame;
+
+		s32 pos = (s32)(frame * FPS_TEST_SPEED / _fps_test_rates[i]) % (2 * fps_test.range);
+		if (pos > fps_test.range)
+			pos = 2 * fps_test.range - pos;
+		lv_obj_set_x(fps_test.balls[i], pos);
+
+		moved = true;
+	}
+
+	if (moved)
+		lv_refr_now();
+}
+
+static lv_res_t _fps_test_close_action(lv_obj_t *btn)
+{
+	lv_task_del(fps_test.task);
+	fps_test.task = NULL;
+
+	return nyx_win_close_action(btn);
+}
+
+static lv_res_t _create_window_fps_test(lv_obj_t *btn)
+{
+	static const u32 lane_colors[FPS_TEST_LANES] = { 0xFF5555, 0xFFDD00, 0x96FF00 };
+	static lv_style_t ball_styles[FPS_TEST_LANES];
+
+	if (fps_test.task)
+		return LV_RES_OK;
+
+	lv_obj_t *win = nyx_create_standard_window(SYMBOL_DOT" Moving Ball FPS Test", _fps_test_close_action);
+
+	lv_obj_t *cont = lv_cont_create(win, NULL);
+	lv_cont_set_style(cont, &lv_style_transp);
+	lv_cont_set_fit(cont, false, false);
+	lv_obj_set_size(cont, LV_HOR_RES - LV_DPI / 2, LV_VER_RES - (LV_DPI * 11 / 7) - 5);
+
+	fps_test.range = lv_obj_get_width(cont) - FPS_TEST_BALL_SZ;
+	fps_test.start_ms = get_tmr_ms();
+
+	u32 lane_height = lv_obj_get_height(cont) / FPS_TEST_LANES;
+
+	for (u32 i = 0; i < FPS_TEST_LANES; i++)
+	{
+		char lane_text[16];
+		lv_obj_t *lbl_lane = lv_label_create(cont, NULL);
+		lv_obj_set_style(lbl_lane, &hint_small_style_white);
+		s_printf(lane_text, "%d FPS", _fps_test_rates[i]);
+		lv_label_set_text(lbl_lane, lane_text);
+		lv_obj_set_pos(lbl_lane, 0, i * lane_height);
+
+		lv_style_copy(&ball_styles[i], &lv_style_plain_color);
+		ball_styles[i].body.radius = LV_RADIUS_CIRCLE;
+		ball_styles[i].body.main_color = LV_COLOR_HEX(lane_colors[i]);
+		ball_styles[i].body.grad_color = ball_styles[i].body.main_color;
+
+		lv_obj_t *ball = lv_obj_create(cont, NULL);
+		lv_obj_set_style(ball, &ball_styles[i]);
+		lv_obj_set_size(ball, FPS_TEST_BALL_SZ, FPS_TEST_BALL_SZ);
+		lv_obj_set_pos(ball, 0, i * lane_height + (lane_height - FPS_TEST_BALL_SZ) / 2);
+
+		fps_test.balls[i] = ball;
+		fps_test.frames[i] = 0;
+	}
+
+	fps_test.task = lv_task_create(_fps_test_task, 1, LV_TASK_PRIO_HIGHEST, NULL);
+
+	return LV_RES_OK;
+}
+
 static void _create_tab_home(lv_theme_t *th, lv_obj_t *parent)
 {
 	lv_page_set_scrl_layout(parent, LV_LAYOUT_OFF);
@@ -2233,6 +2329,13 @@ static void _create_status_bar(lv_theme_t * th)
 	lv_label_set_text(lbl_fps, SYMBOL_DOT" 1 FPS");
 	lv_obj_align(lbl_fps, lbl_degrees, LV_ALIGN_OUT_RIGHT_MID, LV_DPI / 8, 0);
 	status_bar.fps = lbl_fps;
+
+	lv_obj_t *btn_fps_test = lv_btn_create(status_bar_bg, NULL);
+	lv_obj_t *lbl_fps_test = lv_label_create(btn_fps_test, NULL);
+	lv_label_set_static_text(lbl_fps_test, "FPS Test");
+	lv_obj_set_size(btn_fps_test, LV_DPI * 17 / 8, LV_DPI / 2);
+	lv_obj_align(btn_fps_test, NULL, LV_ALIGN_CENTER, 0, 0);
+	lv_btn_set_action(btn_fps_test, LV_BTN_ACTION_CLICK, _create_window_fps_test);
 
 	// Middle button.
 	//! TODO: Utilize it for more.

@@ -550,9 +550,9 @@ void display_init()
 
 	// Switch to DSI HS mode.
 	// S60 Hz: DIVM 1, DIVN 24, DIVP 1 -> PLLD_OUT 468 MHz, PLLD_OUT0 (DSI-BCLK) 234 MHz, PCLK 78 MHz.
-	// 90 Hz:  DIVM 1, DIVN 36, DIVP 1 -> PLLD_OUT 702 MHz, PLLD_OUT0 (DSI-BCLK) 351 MHz, PCLK 117 MHz.
+	// 90 Hz:  DIVM 0, DIVN 18, DIVP 1 -> PLLD_OUT 702 MHz, PLLD_OUT0 (DSI-BCLK) 351 MHz, PCLK 117 MHz.
 	if(_nx_aula) {
-		clock_enable_plld(1, 36, false, tegra_t210);
+		clock_enable_plld(0, 18, false, tegra_t210);
 	} else {
 		clock_enable_plld(1, 24, false, tegra_t210);
 	}
@@ -566,7 +566,6 @@ void display_init()
 		DSI(DSI_PHY_TIMING_2) = 0x000502AB; // was 0x00030172 (TCLKZERO 0x72 -> 0xAB)
 	}
 
-	// Set 1-by-1 pixel/clock; SHIFT div stays 3, so BCLK 351 / 3 = 117 MHz PCLK (90 Hz).
 	DISPLAY_A(DC_DISP_DISP_CLOCK_CONTROL) = PIXEL_CLK_DIVIDER_PCD1 | SHIFT_CLK_DIVIDER(4); // div3. Default: div4.
 
 	// Set DSI mode to HOST.
