@@ -38,6 +38,8 @@ extern lv_res_t launch_payload(lv_obj_t *list);
 static bool disp_init_done = false;
 static bool do_auto_reload = false;
 
+static volatile u32 _fps_frames = 0;
+
 lv_style_t hint_small_style;
 lv_style_t hint_small_style_white;
 lv_style_t monospace_text;
@@ -316,7 +318,10 @@ static void _disp_fb_flush(int32_t x1, int32_t y1, int32_t x2, int32_t y2, const
 
 	// Rotate and copy to visible framebuffer.
 	if (disp_init_done)
+	{
 		vic_compose();
+		_fps_frames++;
+	}
 
 	// Check if display init was done. If it's the first big draw, init.
 	if (!disp_init_done && ((x2 - x1 + 1) > 600))
@@ -1428,6 +1433,26 @@ static void _update_status_bar(void *params)
 	lv_obj_realign(status_bar.battery_more);
 }
 
+static void _update_fps(void *params)
+{
+	static u32 fps_last_ms = 0;
+
+	u32 now_ms  = get_tmr_ms();
+	u32 elapsed = now_ms - fps_last_ms;
+
+	if (fps_last_ms && elapsed)
+	{
+		char label[16];
+		u32 fps = (_fps_frames * 1000 + elapsed / 2) / elapsed;
+		s_printf(label, SYMBOL_DOT" %2d FPS", fps);
+		lv_label_set_text(status_bar.fps, label);
+		lv_obj_realign(status_bar.fps);
+	}
+
+	fps_last_ms = now_ms;
+	_fps_frames = 0;
+}
+
 static lv_res_t _create_mbox_payloads(lv_obj_t *btn)
 {
 	lv_obj_t *dark_bg = lv_obj_create(lv_scr_act(), NULL);
@@ -2188,7 +2213,7 @@ static void _create_status_bar(lv_theme_t * th)
 	lv_label_set_text(lbl_left, SYMBOL_CLOCK" ");
 	lv_obj_align(lbl_left, NULL, LV_ALIGN_IN_LEFT_MID, LV_DPI * 6 / 11, 0);
 
-	// Time, temperature.
+	// Time, temperature, FPS.
 	lv_obj_t *lbl_time_temp = lv_label_create(status_bar_bg, NULL);
 	lv_label_set_text(lbl_time_temp, "00:00 "SYMBOL_DOT" "SYMBOL_TEMPERATURE" 00.0");
 	lv_obj_align(lbl_time_temp, lbl_left, LV_ALIGN_OUT_RIGHT_MID, 0, 0);
@@ -2203,6 +2228,11 @@ static void _create_status_bar(lv_theme_t * th)
 	lv_label_set_text(lbl_degrees, "C");
 	lv_obj_align(lbl_degrees, lbl_left, LV_ALIGN_OUT_RIGHT_MID, LV_DPI / 50, LV_DPI / 14);
 	status_bar.temp_degrees = lbl_degrees;
+
+	lv_obj_t *lbl_fps = lv_label_create(status_bar_bg, NULL);
+	lv_label_set_text(lbl_fps, SYMBOL_DOT" 1 FPS");
+	lv_obj_align(lbl_fps, lbl_degrees, LV_ALIGN_OUT_RIGHT_MID, LV_DPI / 8, 0);
+	status_bar.fps = lbl_fps;
 
 	// Middle button.
 	//! TODO: Utilize it for more.
@@ -2444,6 +2474,8 @@ static void _nyx_main_menu(lv_theme_t * th)
 
 	system_tasks.task.status_bar = lv_task_create(_update_status_bar, 5000, LV_TASK_PRIO_LOW, NULL);
 	lv_task_ready(system_tasks.task.status_bar);
+
+	lv_task_create(_update_fps, 1000, LV_TASK_PRIO_LOW, NULL);
 
 	lv_task_create(_check_sd_card_removed, 2000, LV_TASK_PRIO_LOWEST, NULL);
 
