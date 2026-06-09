@@ -547,14 +547,13 @@ void display_init()
 
 	// Unblank display.
 	_display_dsi_send_cmd(MIPI_DSI_DCS_SHORT_WRITE, MIPI_DCS_SET_DISPLAY_ON, 20000);
-
+	// 90Hz hack: increase pClk to 117MHz (DsiClk 351)
 	// Switch to DSI HS mode.
 	// DIVM: 1, DIVN: 24, DIVP: 1. PLLD_OUT: 468.0 MHz, PLLD_OUT0 (DSI-BCLK): 234.0 MHz. (PCLK: 78 MHz)
-	clock_enable_plld(1, 24, false, tegra_t210);
+	clock_enable_plld(1, /* 24 */ 36, false, tegra_t210);
 
 	// Set HS PHY timing and finalize DSI packet sequence configuration.
 	reg_write_array((vu32 *)DSI_BASE, _di_dsi_seq_pkt_video_non_burst_no_eot_config, ARRAY_SIZE(_di_dsi_seq_pkt_video_non_burst_no_eot_config));
-
 	// Set 1-by-1 pixel/clock and pixel clock to 234 / 3 = 78 MHz. For 60 Hz refresh rate.
 	DISPLAY_A(DC_DISP_DISP_CLOCK_CONTROL) = PIXEL_CLK_DIVIDER_PCD1 | SHIFT_CLK_DIVIDER(4); // div3. Default: div4.
 
