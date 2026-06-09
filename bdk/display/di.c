@@ -560,9 +560,10 @@ void display_init()
 	// Set HS PHY timing and finalize DSI packet sequence configuration.
 	reg_write_array((vu32 *)DSI_BASE, _di_dsi_seq_pkt_video_non_burst_no_eot_config, ARRAY_SIZE(_di_dsi_seq_pkt_video_non_burst_no_eot_config));
 
-	// Increase PHY timing for 90hz
 	if(_nx_aula) {
-		DSI(DSI_PHY_TIMING_2) = 0x301AB; // TCLKZERO 0x72 -> 0xAB.
+		DSI(DSI_PHY_TIMING_0) = 0x090B0905; // was 0x06070603 (each byte x1.5)
+		DSI(DSI_PHY_TIMING_1) = 0x060F1508; // was 0x040A0E05
+		DSI(DSI_PHY_TIMING_2) = 0x000502AB; // was 0x00030172 (TCLKZERO 0x72 -> 0xAB)
 	}
 
 	// Set 1-by-1 pixel/clock; SHIFT div stays 3, so BCLK 351 / 3 = 117 MHz PCLK (90 Hz).
