@@ -1330,6 +1330,7 @@ static void _about()
 	static const char credits[] =
 		"\nhekate   (c) 2018,      naehrwert, st4rk\n\n"
 		"         (c) 2018-2026, CTCaer\n\n"
+		"         (c) 2026, Souldbminer\n\n"
 		" ___________________________________________\n\n"
 		"Thanks to: %kderrek, nedwill, plutoo,\n"
 		"           shuffle2, smea, thexyz, yellows8%k\n"
@@ -1341,16 +1342,14 @@ static void _about()
 		" - FatFs R0.13c\n"
 		"   (c) 2006-2018, ChaN\n"
 		"   (c) 2018-2022, CTCaer\n\n"
-		" - bcl-1.2.0\n"
-		"   (c) 2003-2006, Marcus Geelnard\n\n"
-		" - blz\n"
-		"   (c) 2018, SciresM\n\n"
+		" - bcl-1.2.0 - (c) 2003-2006, Marcus Geelnard\n\n"
+		" - blz - (c) 2018, SciresM\n\n"
 		" - elfload\n"
 		"   (c) 2014, Owen Shepherd\n"
 		"   (c) 2018, M4xw\n"
 		" ___________________________________________\n\n";
 	static const char octopus[] =
-		"                         %k___\n"
+		"lightoscat             %k___\n"
 		"                      .-'   `'.\n"
 		"                     /         \\\n"
 		"                     |         ;\n"
@@ -1426,7 +1425,7 @@ ment_t ment_top[] = {
 	MDEF_END()
 };
 
-menu_t menu_top = { ment_top, "hekate v6.5.2", 0, 0 };
+menu_t menu_top = { ment_top, "hekate v6.5.2-hoc", 0, 0 };
 
 extern void pivot_stack(u32 stack_top);
 
