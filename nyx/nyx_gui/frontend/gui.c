@@ -1297,8 +1297,9 @@ static void _create_tab_about(lv_theme_t * th, lv_obj_t * parent)
 	lv_label_set_style(lbl_credits, &monospace_text);
 	lv_label_set_recolor(lbl_credits, true);
 	lv_label_set_static_text(lbl_credits,
-		"#C7EA46 hekate# (c) 2018,      #C7EA46 naehrwert#, #C7EA46 st4rk#\n"
+		"#C7EA46 hekate-hoc# (c) 2018,      #C7EA46 naehrwert#, #C7EA46 st4rk#\n"
 		"       (c) 2018-2026, #C7EA46 CTCaer#\n"
+		"       (c) 2026, #C7EA46 Souldbminer#\n"
 		"\n"
 		"#C7EA46 Nyx#    (c) 2019-2026, #C7EA46 CTCaer#\n"
 		"\n"
@@ -1316,8 +1317,7 @@ static void _create_tab_about(lv_theme_t * th, lv_obj_t * parent)
 		"   Copyright (c) 2018-2022, CTCaer\n\n"
 		" - bcl-1.2.0,\n"
 		"   Copyright (c) 2003-2006, Marcus Geelnard\n\n"
-		" - blz,\n"
-		"   Copyright (c) 2018, SciresM\n\n"
+		" - blz - Copyright (c) 2018, SciresM\n\n"
 		" - elfload,\n"
 		"   Copyright (c) 2014, Owen Shepherd\n"
 		"   Copyright (c) 2018, M4xw"
@@ -1329,7 +1329,7 @@ static void _create_tab_about(lv_theme_t * th, lv_obj_t * parent)
 	lv_label_set_recolor(lbl_octopus, true);
 
 	lv_label_set_static_text(lbl_octopus,
-		"\n#00CCFF                          ___#\n"
+		"\nlightoscat#00CCFF                ___#\n"
 		"#00CCFF                       .-'   `'.#\n"
 		"#00CCFF                      /         \\#\n"
 		"#00CCFF                      |         ;#\n"
@@ -2543,7 +2543,7 @@ static void _nyx_main_menu(lv_theme_t * th)
 	// Add all tabs content.
 	char version[32];
 	char rel = (nyx_str->version >> 24) & 0xFF;
-	s_printf(version, "hekate %s%d.%d.%d%c%c",
+	s_printf(version, "hekate %s%d.%d.%d%c%c-hoc",
 			 rel ? "v" : "", nyx_str->version & 0xFF, (nyx_str->version >> 8) & 0xFF, (nyx_str->version >> 16) & 0xFF, rel > 'a' ? rel : 0,
 			 (nyx_str->info_ex.rsvd_flags & RSVD_FLAG_DRAM_8GB) ? '*' : 0);
 	lv_obj_t *tab_about = lv_tabview_add_tab(tv, version);
