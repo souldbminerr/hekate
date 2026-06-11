@@ -42,14 +42,13 @@ static volatile u32 _fps_frames = 0;
 
 #define FPS_TEST_LANES 3
 #define FPS_TEST_BALL_SZ 64
-#define FPS_TEST_SPEED 600 // px/s.
+#define FPS_TEST_SPEED 300 // px/s.
 #define FPS_TEST_PANEL_HZ 90
 
 typedef struct _fps_test_ctx_t
 {
 	lv_obj_t  *balls[FPS_TEST_LANES];
 	lv_task_t *task;
-	u32 start_ms;
 	u32 master_frame;
 	u32 frames[FPS_TEST_LANES];
 	s32 range;
@@ -2046,14 +2045,13 @@ failed_sd_mount:
 
 static void _fps_test_task(void *params)
 {
-	u32 elapsed = get_tmr_ms() - fps_test.start_ms;
-
-	u32 master = elapsed * FPS_TEST_PANEL_HZ / 1000;
-	if (master == fps_test.master_frame)
 		return;
-	fps_test.master_frame = master;
+	DISPLAY_A(DC_CMD_INT_STATUS) = DC_CMD_INT_FRAME_END_INT;
 
-	bool moved = false;
+	vic_compose();
+	_fps_frames++;
+
+	u32 master = ++fps_test.master_frame;
 
 	for (u32 i = 0; i < FPS_TEST_LANES; i++) {
 		u32 frame = master * _fps_test_rates[i] / FPS_TEST_PANEL_HZ;
@@ -2065,19 +2063,15 @@ static void _fps_test_task(void *params)
 		if (pos > fps_test.range)
 			pos = 2 * fps_test.range - pos;
 		lv_obj_set_x(fps_test.balls[i], pos);
-
-		moved = true;
 	}
 
-	if (moved) {
-		lv_refr_now();
-		vic_compose();
-		_fps_frames++;
-	}
+	lv_refr_now();
 }
 
 static lv_res_t _fps_test_close_action(lv_obj_t *btn)
 {
+	display_disable_interrupt(DC_CMD_INT_FRAME_END_INT);
+
 	lv_task_del(fps_test.task);
 	fps_test.task = NULL;
 
@@ -2100,8 +2094,9 @@ static lv_res_t _create_window_fps_test(lv_obj_t *btn)
 	lv_obj_set_size(cont, LV_HOR_RES - LV_DPI / 2, LV_VER_RES - (LV_DPI * 11 / 7) - 5);
 
 	fps_test.range = lv_obj_get_width(cont) - FPS_TEST_BALL_SZ;
-	fps_test.start_ms = get_tmr_ms();
 	fps_test.master_frame = 0;
+
+	display_enable_interrupt(DC_CMD_INT_FRAME_END_INT);
 
 	u32 lane_height = lv_obj_get_height(cont) / FPS_TEST_LANES;
 
@@ -2131,6 +2126,71 @@ static lv_res_t _create_window_fps_test(lv_obj_t *btn)
 	fps_test.task = lv_task_create(_fps_test_task, 1, LV_TASK_PRIO_HIGHEST, NULL);
 
 	return LV_RES_OK;
+}
+
+static lv_obj_t *debug_lbl = NULL;
+
+static void _update_debug_info(void *p)
+{
+	(void)p;
+	if (!debug_lbl)
+		return;
+
+	u32 base = CLOCK(CLK_RST_CONTROLLER_PLLD_BASE);
+	u32 misc = CLOCK(CLK_RST_CONTROLLER_PLLD_MISC);
+	u32 divm = base & 0xFF; if (!divm) divm = 1;
+	u32 divn = (base >> 11) & 0xFF;
+	u32 divp = (base >> 20) & 0x7;
+	u32 en   = (base >> 30) & 1;
+	s32 sdm  = (s32)(s16)(misc & 0xFFFF); // signed PLLD_SDM_DIN
+
+	u64 n8192    = (u64)divn * 8192 + 4096 + sdm;
+	u64 vco_khz  = 38400ull * n8192 / 8192 / divm;
+	u64 bclk_khz = vco_khz >> (divp + 1);
+	u64 pclk_khz = bclk_khz / 3; // hekate uses SHIFT_CLK_DIVIDER = div3
+
+	u32 act = DISPLAY_A(DC_DISP_ACTIVE);
+	u32 syn = DISPLAY_A(DC_DISP_SYNC_WIDTH);
+	u32 bpo = DISPLAY_A(DC_DISP_BACK_PORCH);
+	u32 fpo = DISPLAY_A(DC_DISP_FRONT_PORCH);
+	u32 ht  = (act & 0xFFFF) + (syn & 0xFFFF) + (bpo & 0xFFFF) + (fpo & 0xFFFF);
+	u32 vt  = ((act >> 16) & 0xFFFF) + ((syn >> 16) & 0xFFFF) + ((bpo >> 16) & 0xFFFF) + ((fpo >> 16) & 0xFFFF);
+	u32 refr = (ht && vt) ? (u32)(pclk_khz * 1000 / ((u64)ht * vt)) : 0;
+
+	char buf[512];
+	s_printf(buf,
+		"#00DDFF PLL-D / DSI clock#\n"
+		"PLLD_BASE 0x%08X  PLLD_MISC 0x%08X\n"
+		"DIVN %d   DIVP %d   DIVM %d   EN %d   SDM %d\n"
+		"VCO  %d MHz\n"
+		"BCLK %d MHz  (DSI-BCLK / PLLD_OUT0)\n"
+		"PCLK %d MHz  (BCLK / 3)\n\n"
+		"#00DDFF DC raster#\n"
+		"DISP_CLOCK_CTRL 0x%08X\n"
+		"Htotal %d   Vtotal %d\n"
+		"Refresh (from regs) %d Hz\n\n"
+		"#00DDFF Panel#\n"
+		"Panel ID 0x%04X\n\n"
+		"#888888 90Hz target: DIVN 18, DIVP 0 -> BCLK 352 / PCLK 117 / ~90Hz#",
+		base, misc, divn, divp, divm, en, sdm,
+		(u32)(vco_khz / 1000), (u32)(bclk_khz / 1000), (u32)(pclk_khz / 1000),
+		DISPLAY_A(DC_DISP_DISP_CLOCK_CONTROL), ht, vt, refr,
+		display_get_decoded_panel_id());
+
+	lv_label_set_text(debug_lbl, buf);
+}
+
+static void _create_tab_debug(lv_theme_t *th, lv_obj_t *parent)
+{
+	(void)th;
+	lv_obj_t *lbl = lv_label_create(parent, NULL);
+	lv_label_set_recolor(lbl, true);
+	lv_obj_set_style(lbl, &monospace_text);
+	lv_obj_set_pos(lbl, LV_DPI / 2, LV_DPI / 3);
+	debug_lbl = lbl;
+
+	_update_debug_info(NULL);
+	lv_task_create(_update_debug_info, 500, LV_TASK_PRIO_LOW, NULL);
 }
 
 static void _create_tab_home(lv_theme_t *th, lv_obj_t *parent)
@@ -2574,11 +2634,14 @@ static void _nyx_main_menu(lv_theme_t * th)
 
 	lv_obj_t *tab_options = lv_tabview_add_tab(tv, SYMBOL_SETTINGS" Options");
 
+	lv_obj_t *tab_debug = lv_tabview_add_tab(tv, SYMBOL_LIST" Debug");
+
 	_create_tab_about(th, tab_about);
 	_create_tab_home(th, tab_home);
 	create_tab_tools(th, tab_tools);
 	create_tab_info(th, tab_info);
 	create_tab_options(th, tab_options);
+	_create_tab_debug(th, tab_debug);
 
 	lv_tabview_set_tab_act(tv, 1, false);
 

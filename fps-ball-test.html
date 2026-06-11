@@ -70,7 +70,7 @@
 	<header>
 		<h1>Moving Ball FPS Test</h1>
 		<span class="hz" id="hz">Display: ... Hz</span>
-		<span class="hint">Same speed (600 px/s), different update rates. A 60 Hz monitor cannot show the 90 FPS lane correctly.</span>
+		<span class="hint">Same speed (300 px/s), different update rates. A 60 Hz monitor cannot show the 90 FPS lane correctly.</span>
 	</header>
 
 	<div id="lanes"></div>
@@ -84,7 +84,7 @@ const LANES = [
 	{ fps: 90, color: "#96ff00" },
 ];
 const BALL_SZ = 64;  // px
-const SPEED   = 600; // px/s
+const SPEED   = 300; // px/s
 
 const lanesEl = document.getElementById("lanes");
 for (const lane of LANES) {
