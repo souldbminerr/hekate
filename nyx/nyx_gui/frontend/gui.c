@@ -2045,6 +2045,7 @@ failed_sd_mount:
 
 static void _fps_test_task(void *params)
 {
+	if (!(DISPLAY_A(DC_CMD_INT_STATUS) & DC_CMD_INT_FRAME_END_INT))
 		return;
 	DISPLAY_A(DC_CMD_INT_STATUS) = DC_CMD_INT_FRAME_END_INT;
 
